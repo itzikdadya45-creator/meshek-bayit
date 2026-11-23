@@ -216,3 +216,116 @@ const save=()=>{localStorage.setItem("mb2",JSON.stringify(S));draw()};
 const buzz=()=>navigator.vibrate&&navigator.vibrate(8);
 const PEOPLE=["איציק","אסתר","סינתיה"];
 let
+me=localStorage.getItem("me");
+if(!me){me=(prompt("מי משתמש במכשיר הזה? איציק, אסתר, סינתיה, או מטבח")||"מטבח").trim();localStorage.setItem("me",me)}
+const nm=w=>w===me?"אני":w;
+const todayStr=()=>new Date().toISOString().slice(0,10);
+const opts=PEOPLE.map(p=>`<option value="${p}">${nm(p)}</option>`).join("");
+tWho.innerHTML=opts+'<option value="כולם">כולם</option>';cOwner.innerHTML=opts;
+if(PEOPLE.includes(me)){tWho.value=me;cOwner.value=me}
+fShelf.innerHTML=SHELVES.map((s,i)=>`<option value="${i}">${FREEZER.includes(i)?"מקפיא · ":""}${s}</option>`).join("");
+
+parts.forEach(([k,t,id])=>{const d=document.createElement("div");d.className="icon";
+ d.innerHTML=svg(k)+`<span class="t">${t}</span>`;
+ d.addEventListener("pointermove",e=>{const r=d.getBoundingClientRect(),x=(e.clientX-r.left)/r.width-.5,y=(e.clientY-r.top)/r.height-.5;
+  d.style.transform=`perspective(600px) rotateX(${-y*14}deg) rotateY(${x*14}deg) translateY(-3px)`;d.style.setProperty("--sx",(x+.5)*100+"%");d.style.setProperty("--sy",(y+.5)*100+"%")});
+ const reset=()=>d.style.transform="";d.addEventListener("pointerleave",reset);d.addEventListener("pointercancel",reset);
+ d.addEventListener("pointerenter",()=>{d.classList.remove("sh");void d.offsetWidth;d.classList.add("sh")});
+ d.addEventListener("pointerdown",()=>{d.classList.remove("sh");void d.offsetWidth;d.classList.add("sh")});
+ d.onclick=()=>{buzz();reset();openFrom(d,id||"soon",t)};grid.appendChild(d)});
+
+function show(id,el){const sc=document.getElementById(id);draw();sc.style.display="block";sc.scrollTop=0;
+ if(!el)return;const r=el.getBoundingClientRect();sc.style.transformOrigin=`${r.left+r.width/2}px ${r.top+r.height/2}px`;
+ sc.animate([{transform:"perspective(1200px) scale(.12) rotateY(-220deg)",opacity:.3,borderRadius:"40px"},{transform:"perspective(1200px) scale(1) rotateY(0)",opacity:1,borderRadius:"0px"}],{duration:1500,easing:"cubic-bezier(.22,1,.36,1)"})}
+function openFrom(el,id,t){if(id==="soon")soonT.textContent=t;
+ if(id==="fridge")return scene3D("fr",()=>show("fridge"));
+ if(id==="power")return scene3D("pw",()=>show("power"));
+ show(id,el)}
+function scene3D(type,done){const sc=document.getElementById("scene");sc.innerHTML="";sc.style.display="flex";
+ const o=document.createElement("div");o.className="obj"+(type==="pw"?" pw":"");
+ o.innerHTML=type==="fr"?'<div class="in"><i></i><i></i><b></b></div><div class="sd l"></div><div class="sd r"></div><div class="dr dtop"><em>מקרר</em></div><div class="dr dbot"><em>מקפיא</em></div>'
+  :'<div class="in p">'+"<span></span>".repeat(8)+'</div><div class="sd l"></div><div class="sd r"></div><div class="dr dfull"><em>ארון חשמל</em></div>';
+ sc.appendChild(o);
+ o.animate([{transform:"translateZ(-2400px) rotateY(-35deg)",opacity:0},{transform:"translateZ(-2200px) rotateY(-32deg)",opacity:1,offset:.12},{transform:"translateZ(0) rotateY(0)",opacity:1}],
+  {duration:1900,easing:"cubic-bezier(.16,1,.3,1)",fill:"forwards"}).onfinish=()=>{
+  const ds=[...o.querySelectorAll(".dr")];let n=0;
+  ds.forEach(d=>{d.animate([{transform:"rotateY(0)"},{transform:"rotateY(115deg)"}],{duration:1300,easing:"cubic-bezier(.65,0,.35,1)",fill:"forwards"}).onfinish=()=>{
+   if(++n<ds.length)return;
+   o.animate([{transform:"translateZ(0)",opacity:1},{transform:"translateZ(1000px)",opacity:0}],{duration:900,delay:250,easing:"cubic-bezier(.7,0,.3,1)",fill:"forwards"}).onfinish=()=>{sc.style.display="none";done()}}})}}
+let unlocked=false;
+function closeAll(){buzz();unlocked=false;document.querySelectorAll(".screen").forEach(s=>s.style.display="none");draw()}
+
+function ics(lines){const a=document.createElement("a");
+ a.href="data:text/calendar;charset=utf-8,"+encodeURIComponent(["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//MeshekBayit//HE","BEGIN:VEVENT","UID:"+Date.now()+"@mb",...lines,"END:VEVENT","END:VCALENDAR"].join("\r\n"));
+ a.download="mb.ics";a.click()}
+function addTask(){const title=tTitle.value.trim();if(!title){tTitle.focus();return}buzz();
+ S.tasks.push({title,date:tDate.value,time:tTime.value,who:tWho.value,alert:+tAlert.value,done:false});tTitle.value="";save()}
+function toggle(i){buzz();S.tasks[i].done=!S.tasks[i].done;save()}
+const chk='<svg class="chk" viewBox="0 0 28 28"><circle cx="14" cy="14" r="12.5"/><path d="M8.5 14.3l3.6 3.6 7.4-7.6"/></svg>';
+function taskRow(t,i){return `<div class="card row ${t.done?'done on':''}"><span onclick="toggle(${i})">${chk}</span>
+ <div class="grow"><div class="title">${t.title}</div><small>${t.date||'ללא תאריך'}${t.time?' · '+t.time:''} · ${nm(t.who)}</small></div>
+ ${t.done?'':`<button type="button" class="btn" onclick="taskCal(${i})">⏰</button>`}</div>`}
+function taskCal(i){const t=S.tasks[i];if(!t.date){alert("צריך לבחור תאריך למשימה");return}
+ ics(["DTSTART:"+t.date.replace(/-/g,"")+"T"+(t.time||"09:00").replace(":","")+"00","DURATION:PT30M","SUMMARY:"+t.title,"BEGIN:VALARM","ACTION:DISPLAY","DESCRIPTION:"+t.title,"TRIGGER:-PT"+(t.alert||0)+"M","END:VALARM"])}
+function openToday(){buzz();show("today")}
+
+function addItem(){const n=fName.value.trim();if(!n){fName.focus();return}buzz();S.items.push({n,s:+fShelf.value,in:true,exp:fExp.value});fName.value="";fExp.value="";save()}
+function toggleItem(i){buzz();S.items[i].in=!S.items[i].in;save()}
+const soonExp=d=>d&&(new Date(d)-new Date(todayStr()))/864e5<=2;
+let dg=null;
+function itDown(e,i){dg={i,el:e.currentTarget,x:e.clientX,y:e.clientY,m:false};dg.el.setPointerCapture(e.pointerId)}
+document.addEventListener("pointermove",e=>{if(!dg)return;const dx=e.clientX-dg.x,dy=e.clientY-dg.y;
+ if(!dg.m&&Math.hypot(dx,dy)<8)return;dg.m=true;
+ Object.assign(dg.el.style,{transform:`translate(${dx}px,${dy}px) scale(1.15)`,zIndex:60,pointerEvents:"none"});
+ document.querySelectorAll(".shelf").forEach(s=>s.classList.remove("hl"));
+ const sh=document.elementFromPoint(e.clientX,e.clientY)?.closest(".shelf");if(sh)sh.classList.add("hl")});
+document.addEventListener("pointerup",e=>{if(!dg)return;const d=dg;dg=null;if(!d.m){toggleItem(d.i);return}
+ const sh=document.elementFromPoint(e.clientX,e.clientY)?.closest(".shelf");
+ if(sh){const it=S.items.splice(d.i,1)[0];it.s=+sh.dataset.s;S.items.push(it)}buzz();save()});
+const shelfHTML=si=>`<div class="shelf" data-s="${si}"><div class="sl">${SHELVES[si]}</div><div class="items">`+
+ S.items.map((it,i)=>[it,i]).filter(([it])=>it.s===si).map(([it,i])=>`<div class="it ${it.in?'':'out'} ${soonExp(it.exp)?'ex':''}" onpointerdown="itDown(event,${i})"><span>${emo(it.n)}</span><small>${it.n}</small></div>`).join("")+`</div></div>`;
+
+function unlock(){const p=wPin.value;if(p.length<4){alert("קוד של 4 ספרות לפחות");return}
+ if(!S.pin){S.pin=p;unlocked=true}else if(p===S.pin)unlocked=true;else alert("קוד שגוי");wPin.value="";save()}
+function addCard(){const n=cName.value.trim();if(!n){cName.focus();return}buzz();
+ S.cards.push({n,owner:cOwner.value,bank:cBank.value.trim(),l:cLast.value.replace(/\D/g,"").slice(-4),exp:cExp.value,day:cDay.value,limit:+cLimit.value||0,spent:0});
+ ["cName","cBank","cLast","cExp","cDay","cLimit"].forEach(x=>document.getElementById(x).value="");save()}
+function setNum(path,i,key,v){S[path][i][key]=+v||0;save()}
+
+function addBday(){const n=bName.value.trim();if(!n){bName.focus();return}buzz();S.bdays.push({n,d:bDate.value});bName.value="";bDate.value="";save()}
+function setBday(i,v){S.bdays[i].d=v;save()}
+function daysTo(d){const t=new Date(todayStr()),x=new Date(d);x.setFullYear(t.getFullYear());if(x<t)x.setFullYear(t.getFullYear()+1);return Math.round((x-t)/864e5)}
+function bdCal(i){const b=S.bdays[i];if(!b.d){alert("צריך תאריך");return}
+ ics(["DTSTART;VALUE=DATE:"+b.d.replace(/-/g,""),"RRULE:FREQ=YEARLY","SUMMARY:יום הולדת "+b.n,"BEGIN:VALARM","ACTION:DISPLAY","DESCRIPTION:יום הולדת "+b.n+" בעוד שבועיים","TRIGGER:-P14D","END:VALARM"])}
+
+function draw(){
+ const all=S.tasks.map((t,i)=>[t,i]),open=all.filter(([t])=>!t.done);
+ tOpen.innerHTML=open.map(([t,i])=>taskRow(t,i)).join("")||'<p class="empty">אין משימות פתוחות</p>';
+ tDone.innerHTML=all.filter(([t])=>t.done).map(([t,i])=>taskRow(t,i)).join("");
+ const td=open.filter(([t])=>!t.date||t.date<=todayStr());
+ tToday.innerHTML=td.map(([t,i])=>taskRow(t,i)).join("")||'<p class="empty">אין משימות להיום</p>';
+ side.className="side"+(open.length?" hot":"");side.innerHTML=svg("check")+`<b>${open.length}</b>משימות`;
+ fTop.innerHTML=[0,1,2].map(shelfHTML).join("");fBot.innerHTML=FREEZER.map(shelfHTML).join("");
+ const miss=S.items.filter(it=>!it.in);
+ fShop.innerHTML=miss.map(it=>`<div class="card row"><span style="font-size:24px">${emo(it.n)}</span><div class="grow title">${it.n}</div><a class="btn" href="https://www.shopevergreenkosher.com/" target="_blank">לקנייה</a></div>`).join("")||'<p class="empty">לא חסר כלום</p>';
+ const now=S.power.reduce((a,p)=>a+p.now,0),last=S.power.reduce((a,p)=>a+p.last,0);
+ pTot.textContent="$"+now.toFixed(2);
+ pCmp.innerHTML=last?`חודש שעבר $${last.toFixed(2)} <span class="${now>last?'up':'down'}">${now>last?'▲':'▼'}</span>`:"";
+ pList.innerHTML=S.power.map((p,i)=>`<div class="card form"><div class="title">${p.n} ${p.last?`<span class="${p.now>p.last?'up':'down'}">${p.now>p.last?'▲':'▼'}</span>`:''}</div>
+  <div class="f"><span>החודש $</span><input inputmode="decimal" value="${p.now||''}" onchange="setNum('power',${i},'now',this.value)"></div>
+  <div class="f"><span>חודש שעבר $</span><input inputmode="decimal" value="${p.last||''}" onchange="setNum('power',${i},'last',this.value)"></div></div>`).join("");
+ wLock.style.display=unlocked?"none":"grid";wIn.style.display=unlocked?"block":"none";
+ wMsg.textContent=S.pin?"הכנס קוד לארנק":"בחר קוד לארנק (4 ספרות לפחות)";
+ wTot.textContent="$"+S.cards.reduce((a,c)=>a+(c.spent||0),0).toFixed(2);
+ wCards.innerHTML=S.cards.map((c,i)=>`<div class="cc" style="animation-delay:${i*.12}s"><div class="title">${c.n}</div><small>${c.bank||''}${c.owner?' · '+nm(c.owner):''}</small>
+  <div class="n">•••• ${c.l||''}</div><small>${c.exp?'תוקף '+c.exp:''}${c.day?' · חיוב ב-'+c.day+' לחודש':''}${c.limit?' · מסגרת $'+c.limit:''}</small>
+  <input inputmode="decimal" placeholder="הוצאות החודש $" value="${c.spent||''}" onchange="setNum('cards',${i},'spent',this.value)"></div>`).join("")||'<p class="empty">עוד אין כרטיסים</p>';
+ bList.innerHTML=S.bdays.map((b,i)=>{const n=b.d?daysTo(b.d):null;return `<div class="card row"><span style="font-size:26px">🎂</span>
+  <div class="grow"><div class="title">${b.n}</div><small class="${n!==null&&n<=14?'warn':''}">${n===null?'בחר תאריך':n===0?'היום!':'בעוד '+n+' ימים'}</small>
+  <input type="date" value="${b.d}" onchange="setBday(${i},this.value)" style="margin-top:8px"></div>
+  <button type="button" class="btn" onclick="bdCal(${i})">⏰</button></div>`}).join("");
+}
+draw();
+</script>
+</body>
+</html>
